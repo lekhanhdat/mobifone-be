@@ -1,17 +1,22 @@
 const mongoose = require("mongoose");
 
 const subscriberSchema = new mongoose.Schema({
-  TYPE: String,
-  STA_TYPE: String,
-  SUB_ID: String,
-  SUB_TYPE: String,
-  STA_DATE: Date,
-  END_DATE: Date,
-  PROVINCE: String,
-  DISTRICT: String,
-  PCK_CODE: String,
-  PCK_DATE: Date,
-  PCK_CHARGE: Number,
+  TYPE: { type: String, required: true }, // Bắt buộc
+  STA_TYPE: { type: String, required: true }, // Bắt buộc
+  SUB_ID: { type: String, required: true, unique: true }, // Bắt buộc và unique
+  SUB_TYPE: { type: String, required: true }, // Bắt buộc
+  STA_DATE: { type: Date, required: true }, // Bắt buộc
+  END_DATE: { type: Date, required: false }, // Optional (có thể null)
+  PROVINCE: { type: String, required: true }, // Bắt buộc
+  DISTRICT: { type: String, required: true }, // Bắt buộc
+  PCK_CODE: { type: String, required: false }, // Optional
+  PCK_DATE: { type: Date, required: false }, // Optional
+  PCK_CHARGE: { type: Number, required: false }, // Optional
 });
+
+// Index cho query nhanh (đã có, giữ nguyên)
+subscriberSchema.index({ PROVINCE: 1, DISTRICT: 1 });
+subscriberSchema.index({ STA_DATE: 1 });
+subscriberSchema.index({ PCK_CODE: 1 });
 
 module.exports = mongoose.model("Subscriber", subscriberSchema);
