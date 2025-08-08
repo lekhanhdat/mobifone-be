@@ -17,11 +17,13 @@ app.get("/", (req, res) => {
   res.send("Hello from API");
 });
 
-const subscriberRoutes = require("./routes/subscriber.routes");
-app.use("/api/subscribers", subscriberRoutes);
+app.use('/api/subscribers', require('./routes/subscriber.routes'));
+app.use('/api/stats', require('./routes/stat.routes'));
 
-const statsRoutes = require("./routes/stat.routes");
-app.use("/api/stats", statsRoutes);
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Server error' });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
