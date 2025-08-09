@@ -19,13 +19,29 @@ const getFullNamesCache = async () => {
 };
 
 exports.getSummaryStats = async (filter = {}) => {
+  // Tính total
   const total = await Subscriber.countDocuments(filter);
-  const newSubs = await Subscriber.countDocuments({ ...filter, STA_DATE: { $exists: true } }); // Adjust for new in period
-  const canceledSubs = await Subscriber.countDocuments({ ...filter, END_DATE: { $exists: true } });
-  // % change: Compare with previous period (e.g., last month) - implement logic
-  const prevFilter = { ...filter }; // TODO: Adjust for prev month (use date tools)
-  const prevNew = await Subscriber.countDocuments(prevFilter); // Example, customize
-  const percentChange = prevNew ? ((newSubs - prevNew) / prevNew * 100).toFixed(2) : 0;
+
+  // New subs: STA_DATE exists và trong period (nếu filter có STA_DATE range)
+  const newSubsMatch = { ...filter, STA_DATE: { $exists: true } };
+  const newSubs = await Subscriber.countDocuments(newSubsMatch);
+
+  // Canceled: END_DATE exists
+  const canceledMatch = { ...filter, END_DATE: { $exists: true } };
+  const canceledSubs = await Subscriber.countDocuments(canceledMatch);
+
+  // Percent change: So với tháng trước (dùng aggregation để lấy count prev)
+  let prevNew = 0;
+  if (filter.STA_DATE) { // Nếu có range, tính prev range tương đương
+    const { $gte: start, $lte: end } = filter.STA_DATE;
+    const prevStart = new Date(start);
+    prevStart.setMonth(prevStart.getMonth() - 1);
+    const prevEnd = new Date(end);
+    prevEnd.setMonth(prevEnd.getMonth() - 1);
+    prevNew = await Subscriber.countDocuments({ ...filter, STA_DATE: { $gte: prevStart, $lte: prevEnd } });
+  }
+  const percentChange = prevNew ? ((newSubs - prevNew) / prevNew * 100).toFixed(2) : 'N/A';
+
   return { total, newSubs, canceledSubs, percentChange };
 };
 

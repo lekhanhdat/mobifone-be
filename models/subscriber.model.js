@@ -14,9 +14,12 @@ const subscriberSchema = new mongoose.Schema({
   PCK_CHARGE: { type: Number, required: false }, // Optional
 });
 
-// Index cho query nhanh (đã có, giữ nguyên)
+// Index cho query nhanh 
 subscriberSchema.index({ PROVINCE: 1, DISTRICT: 1 });
 subscriberSchema.index({ STA_DATE: 1 });
 subscriberSchema.index({ PCK_CODE: 1 });
+subscriberSchema.index({ END_DATE: 1 }); // Cho query canceled
+subscriberSchema.index({ SUB_TYPE: 1 });
+subscriberSchema.index({ STA_TYPE: 1 });
 
 module.exports = mongoose.model("Subscriber", subscriberSchema);

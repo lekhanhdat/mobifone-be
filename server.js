@@ -19,6 +19,7 @@ app.get("/", (req, res) => {
 
 app.use('/api/subscribers', require('./routes/subscriber.routes'));
 app.use('/api/stats', require('./routes/stat.routes'));
+app.use('/api/auth', require('./routes/auth.routes'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -28,5 +29,8 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
-
+app.use((err, req, res, next) => {
+  console.error(err.message); // Không stack để tránh leak
+  res.status(500).json({ message: 'Server error', details: process.env.NODE_ENV === 'development' ? err.message : undefined });
+});
 
