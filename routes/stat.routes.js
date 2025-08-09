@@ -6,5 +6,6 @@ router.get('/summary', statsController.getSummaryStats);
 router.get('/packages', statsController.getPackageStats);
 router.get('/trend', statsController.getGrowthTrend);
 router.get('/distribution', statsController.getDistribution);
+router.get('/options', statsController.getOptions);
 
 module.exports = router;

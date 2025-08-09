@@ -34,3 +34,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error', details: process.env.NODE_ENV === 'development' ? err.message : undefined });
 });
 
+app.use(cors({ origin: 'http://localhost:5173' })); 
