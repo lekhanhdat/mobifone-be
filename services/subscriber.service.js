@@ -1,3 +1,4 @@
+// subscriber.service.js (full code, thay thế file cũ)
 const Subscriber = require('../models/subscriber.model');
 const District = require('../models/district.model');
 const StaType = require('../models/sta_type.model');
@@ -17,6 +18,76 @@ const getFullNamesCache = async () => {
   }
   return cache;
 };
+
+// ... (giữ nguyên getSummaryStats)
+
+exports.getDistinctValues = async (field) => {
+  return await Subscriber.distinct(field);
+};
+
+exports.getDistrictsByProvince = async (province) => {
+  const districts = await District.find({ PROVINCE: province });
+  return districts.map(d => ({ value: d.DISTRICT, label: d.FULL_NAME || d.DISTRICT }));
+};
+
+exports.getAggregationPie = async (groupBy) => {
+  let groupStage;
+  if (groupBy === 'province') {
+    groupStage = { _id: '$PROVINCE', count: { $sum: 1 } };
+  } else if (groupBy === 'district') {
+    groupStage = { _id: { province: '$PROVINCE', district: '$DISTRICT' }, count: { $sum: 1 } };
+  } else {
+    throw new Error('Invalid groupBy');
+  }
+
+  const agg = await Subscriber.aggregate([
+    { $group: groupStage },
+    { $project: { _id: 0, label: '$_id', value: '$count' } } // Format for ChartJS: [{label: 'HN', value: 100}]
+  ]);
+
+  if (groupBy === 'district') {
+    const { districtMap } = await getFullNamesCache();
+    agg.forEach(item => {
+      item.label = districtMap.get(`${item.label.province}-${item.label.district}`) || `${item.label.district} (${item.label.province})`;
+    });
+  } else {
+    agg.forEach(item => { item.label = item.label; }); // Province as is
+  }
+
+  return agg;
+};
+
+exports.getBreakdownAgg = async (groupBy) => {
+  let groupStage;
+  if (groupBy === 'province-district') {
+    groupStage = { _id: { province: '$PROVINCE', district: '$DISTRICT' }, count: { $sum: 1 } };
+  } else {
+    groupStage = { _id: `$${groupBy.toUpperCase()}`, count: { $sum: 1 } }; // TYPE, STA_TYPE, SUB_TYPE
+  }
+
+  const agg = await Subscriber.aggregate([
+    { $group: groupStage },
+    { $sort: { count: -1 } } // Sort descending by count
+  ]);
+
+  const { districtMap, staMap, subMap } = await getFullNamesCache();
+  agg.forEach(item => {
+    if (groupBy === 'province-district') {
+      item._id = districtMap.get(`${item._id.province}-${item._id.district}`) || `${item._id.district} (${item._id.province})`;
+    } else if (groupBy === 'sta_type') {
+      item._id = staMap.get(item._id) || item._id;
+    } else if (groupBy === 'sub_type') {
+      item._id = subMap.get(item._id) || item._id;
+    }
+    // TYPE có lẽ không cần map, giữ nguyên
+  });
+
+  return agg;
+};
+
+exports.getFullNamesCache = getFullNamesCache;
+exports.getSummaryStats = // ... (giữ nguyên);
+
 
 exports.getSummaryStats = async (filter = {}) => {
   const now = new Date();
@@ -62,5 +133,3 @@ exports.getSummaryStats = async (filter = {}) => {
 
   return { total, newSubs, canceledSubs, totalPackages, percentNew, percentCanceled };
 };
-
-exports.getFullNamesCache = getFullNamesCache;

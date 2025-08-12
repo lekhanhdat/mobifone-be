@@ -99,3 +99,47 @@ exports.getSubscriberById = async (req, res) => {
     res.status(500).json({ message: 'Internal error', details: err.message });
   }
 };
+
+exports.getDistinct = async (req, res) => {
+  try {
+    const { field } = req.query;
+    if (!field) return res.status(400).json({ error: 'Field required' });
+    const values = await subService.getDistinctValues(field.toUpperCase());
+    res.json(values);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getDistricts = async (req, res) => {
+  try {
+    const { province } = req.query;
+    if (!province) return res.status(400).json({ error: 'Province required' });
+    const districts = await subService.getDistrictsByProvince(province);
+    res.json(districts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getPieAgg = async (req, res) => {
+  try {
+    const { groupBy } = req.query; // 'province' or 'district'
+    if (!['province', 'district'].includes(groupBy)) return res.status(400).json({ error: 'Invalid groupBy' });
+    const data = await subService.getAggregationPie(groupBy);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getBreakdown = async (req, res) => {
+  try {
+    const { groupBy } = req.query; // 'province-district', 'type', 'sta_type', 'sub_type'
+    if (!['province-district', 'type', 'sta_type', 'sub_type'].includes(groupBy)) return res.status(400).json({ error: 'Invalid groupBy' });
+    const data = await subService.getBreakdownAgg(groupBy);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
