@@ -4,7 +4,7 @@ const District = require('../models/district.model');
 const StaType = require('../models/sta_type.model');
 const SubType = require('../models/sub_type.model');
 
-let cache = null; // Cache full names (load once, small data)
+let cache = null;
 const getFullNamesCache = async () => {
   if (!cache) {
     const districts = await District.find({});
@@ -13,13 +13,30 @@ const getFullNamesCache = async () => {
     cache = {
       districtMap: new Map(districts.map(d => [`${d.PROVINCE}-${d.DISTRICT}`, d.FULL_NAME || d.DISTRICT])),
       staMap: new Map(staTypes.map(s => [s.STA_TYPE, s.NAME || s.STA_TYPE])),
-      subMap: new Map(subTypes.map(s => [s.SUB_TYPE, s.NAME || s.SUB_TYPE]))
+      subMap: new Map(subTypes.map(s => [s.SUB_TYPE, s.NAME || s.SUB_TYPE])),
+      provinceMap: new Map([  // Hardcode 
+        ['QNA', 'Quảng Nam'],
+      ])
     };
   }
   return cache;
 };
 
-// ... (giữ nguyên getSummaryStats)
+exports.getOptions = async () => {
+  const { staMap, subMap, provinceMap, districtMap } = await getFullNamesCache();
+  const provinces = await District.distinct('PROVINCE');
+  const staTypes = Array.from(staMap.entries()).map(([value, label]) => ({ value, label }));
+  const subTypes = Array.from(subMap.entries()).map(([value, label]) => ({ value, label }));
+  const pckCodes = await Subscriber.distinct('PCK_CODE').then(codes => codes.filter(code => code)); // Filter null
+
+  return {
+    provinces: provinces.map(code => ({ value: code, label: provinceMap.get(code) || code })),
+    staTypes,
+    subTypes,
+    types: [{ value: 'C', label: 'Trả trước' }, { value: 'F', label: 'Trả sau' }], // Hardcode TYPE
+    pckCodes: pckCodes.map(code => ({ value: code, label: code })) // For dropdown optional
+  };
+};
 
 exports.getDistinctValues = async (field) => {
   return await Subscriber.distinct(field);
@@ -42,17 +59,19 @@ exports.getAggregationPie = async (groupBy) => {
 
   const agg = await Subscriber.aggregate([
     { $group: groupStage },
-    { $project: { _id: 0, label: '$_id', value: '$count' } } // Format for ChartJS: [{label: 'HN', value: 100}]
+    { $project: { _id: 0, label: '$_id', value: '$count' } }
   ]);
 
-  if (groupBy === 'district') {
-    const { districtMap } = await getFullNamesCache();
-    agg.forEach(item => {
-      item.label = districtMap.get(`${item.label.province}-${item.label.district}`) || `${item.label.district} (${item.label.province})`;
-    });
-  } else {
-    agg.forEach(item => { item.label = item.label; }); // Province as is
-  }
+  const { districtMap, provinceMap } = await getFullNamesCache();
+  agg.forEach(item => {
+    if (groupBy === 'province') {
+      item.label = provinceMap.get(item.label) || item.label || 'Unknown'; // Giữ Quảng Nam
+    } else if (groupBy === 'district') {
+      const prov = item.label.province || 'Unknown';
+      const dist = item.label.district || 'Unknown';
+      item.label = districtMap.get(`${prov}-${dist}`) || `${dist} (${provinceMap.get(prov) || prov})`;
+    }
+  });
 
   return agg;
 };
@@ -62,24 +81,28 @@ exports.getBreakdownAgg = async (groupBy) => {
   if (groupBy === 'province-district') {
     groupStage = { _id: { province: '$PROVINCE', district: '$DISTRICT' }, count: { $sum: 1 } };
   } else {
-    groupStage = { _id: `$${groupBy.toUpperCase()}`, count: { $sum: 1 } }; // TYPE, STA_TYPE, SUB_TYPE
+    groupStage = { _id: `$${groupBy.toUpperCase()}`, count: { $sum: 1 } };
   }
 
   const agg = await Subscriber.aggregate([
     { $group: groupStage },
-    { $sort: { count: -1 } } // Sort descending by count
+    { $sort: { count: -1 } }
   ]);
 
-  const { districtMap, staMap, subMap } = await getFullNamesCache();
+  const { districtMap, staMap, subMap, provinceMap } = await getFullNamesCache();
   agg.forEach(item => {
     if (groupBy === 'province-district') {
-      item._id = districtMap.get(`${item._id.province}-${item._id.district}`) || `${item._id.district} (${item._id.province})`;
+      const prov = provinceMap.get(item._id.province) || item._id.province || 'Unknown';
+      const dist = districtMap.get(`${item._id.province}-${item._id.district}`) || item._id.district || 'Unknown';
+      item._id = `${dist} (${prov})`;
     } else if (groupBy === 'sta_type') {
-      item._id = staMap.get(item._id) || item._id;
+      item._id = staMap.get(item._id) || item._id || '';
     } else if (groupBy === 'sub_type') {
-      item._id = subMap.get(item._id) || item._id;
+      item._id = subMap.get(item._id) || item._id || '';
+    } else if (groupBy === 'type') {
+      const typeMap = { 'C': 'Trả trước', 'F': 'Trả sau' };
+      item._id = typeMap[item._id] || item._id || 'Unknown';
     }
-    // TYPE có lẽ không cần map, giữ nguyên
   });
 
   return agg;
