@@ -59,21 +59,32 @@ exports.getAggregationPie = async (groupBy) => {
 
   const agg = await Subscriber.aggregate([
     { $group: groupStage },
+    { $match: { count: { $gt: 0 } } }, // Filter count > 0 to remove 0.0%
     { $project: { _id: 0, label: '$_id', value: '$count' } }
   ]);
 
   const { districtMap, provinceMap } = await getFullNamesCache();
+  const seenLabels = new Set(); // For unique
+  const uniqueAgg = [];
+
   agg.forEach(item => {
+    let label;
     if (groupBy === 'province') {
-      item.label = provinceMap.get(item.label) || item.label || 'Unknown'; // Giữ Quảng Nam
+      label = provinceMap.get(item.label) || item.label || 'Unknown';
     } else if (groupBy === 'district') {
       const prov = item.label.province || 'Unknown';
       const dist = item.label.district || 'Unknown';
-      item.label = districtMap.get(`${prov}-${dist}`) || `${dist} (${provinceMap.get(prov) || prov})`;
+      const fullDist = districtMap.get(`${prov}-${dist}`) || dist;
+      label = `${fullDist}, Tỉnh ${provinceMap.get(prov) || prov}`;
+    }
+    if (!seenLabels.has(label)) {
+      item.label = label;
+      uniqueAgg.push(item);
+      seenLabels.add(label);
     }
   });
 
-  return agg;
+  return uniqueAgg;
 };
 
 exports.getBreakdownAgg = async (groupBy) => {
@@ -86,31 +97,38 @@ exports.getBreakdownAgg = async (groupBy) => {
 
   const agg = await Subscriber.aggregate([
     { $group: groupStage },
+    { $match: { count: { $gt: 0 } } }, // Filter count > 0
     { $sort: { count: -1 } }
   ]);
 
   const { districtMap, staMap, subMap, provinceMap } = await getFullNamesCache();
+  const seenIds = new Set();
+  const uniqueAgg = [];
+
   agg.forEach(item => {
+    let id;
     if (groupBy === 'province-district') {
       const prov = provinceMap.get(item._id.province) || item._id.province || 'Unknown';
       const dist = districtMap.get(`${item._id.province}-${item._id.district}`) || item._id.district || 'Unknown';
-      item._id = `${dist} (${prov})`;
+      id = `${dist}, Tỉnh ${prov}`;
     } else if (groupBy === 'sta_type') {
-      item._id = staMap.get(item._id) || item._id || '';
+      id = staMap.get(item._id) || item._id || '';
     } else if (groupBy === 'sub_type') {
-      item._id = subMap.get(item._id) || item._id || '';
+      id = subMap.get(item._id) || item._id || '';
     } else if (groupBy === 'type') {
-      const typeMap = { 'C': 'Trả trước', 'F': 'Trả sau' };
-      item._id = typeMap[item._id] || item._id || 'Unknown';
+      id = (item._id === 'C' ? 'Trả trước' : item._id === 'F' ? 'Trả sau' : item._id) || 'Unknown';
+    }
+    if (!seenIds.has(id)) {
+      item._id = id;
+      uniqueAgg.push(item);
+      seenIds.add(id);
     }
   });
 
-  return agg;
+  return uniqueAgg;
 };
 
 exports.getFullNamesCache = getFullNamesCache;
-exports.getSummaryStats = // ... (giữ nguyên);
-
 
 exports.getSummaryStats = async (filter = {}) => {
   const now = new Date();
