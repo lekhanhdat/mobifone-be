@@ -6,7 +6,7 @@ const subscriberSchema = new mongoose.Schema({
   SUB_ID: { type: String, required: true, unique: true }, // Bắt buộc và unique
   SUB_TYPE: { type: String, required: true }, // Bắt buộc
   STA_DATE: { type: Date, required: true }, // Bắt buộc
-  END_DATE: { type: Date, required: false }, // Optional (có thể null)
+  END_DATE: { type: Date, required: false }, // Optional
   PROVINCE: { type: String, required: true }, // Bắt buộc
   DISTRICT: { type: String, required: true }, // Bắt buộc
   PCK_CODE: { type: String, required: false }, // Optional

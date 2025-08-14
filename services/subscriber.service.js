@@ -58,13 +58,14 @@ exports.getAggregationPie = async (groupBy) => {
   }
 
   const agg = await Subscriber.aggregate([
+    { $match: { DISTRICT: { $ne: null, $ne: '' } } }, // Filter null/empty DISTRICT
     { $group: groupStage },
-    { $match: { count: { $gt: 0 } } }, // Filter count > 0 to remove 0.0%
+    { $match: { count: { $gt: 0 } } }, // Filter count > 0
     { $project: { _id: 0, label: '$_id', value: '$count' } }
   ]);
 
   const { districtMap, provinceMap } = await getFullNamesCache();
-  const seenLabels = new Set(); // For unique
+  const seenLabels = new Set();
   const uniqueAgg = [];
 
   agg.forEach(item => {
@@ -72,10 +73,9 @@ exports.getAggregationPie = async (groupBy) => {
     if (groupBy === 'province') {
       label = provinceMap.get(item.label) || item.label || 'Unknown';
     } else if (groupBy === 'district') {
-      const prov = item.label.province || 'Unknown';
-      const dist = item.label.district || 'Unknown';
-      const fullDist = districtMap.get(`${prov}-${dist}`) || dist;
-      label = `${fullDist}, Tỉnh ${provinceMap.get(prov) || prov}`;
+      const prov = provinceMap.get(item.label.province) || item.label.province || 'Unknown';
+      const dist = districtMap.get(`${item.label.province}-${item.label.district}`) || item.label.district || 'Unknown';
+      label = dist; // Only district, as requested
     }
     if (!seenLabels.has(label)) {
       item.label = label;
@@ -96,6 +96,7 @@ exports.getBreakdownAgg = async (groupBy) => {
   }
 
   const agg = await Subscriber.aggregate([
+    { $match: { DISTRICT: { $ne: null, $ne: '' } } }, // Filter null/empty DISTRICT
     { $group: groupStage },
     { $match: { count: { $gt: 0 } } }, // Filter count > 0
     { $sort: { count: -1 } }
@@ -110,7 +111,7 @@ exports.getBreakdownAgg = async (groupBy) => {
     if (groupBy === 'province-district') {
       const prov = provinceMap.get(item._id.province) || item._id.province || 'Unknown';
       const dist = districtMap.get(`${item._id.province}-${item._id.district}`) || item._id.district || 'Unknown';
-      id = `${dist}, Tỉnh ${prov}`;
+      id = dist; // Only district, as requested
     } else if (groupBy === 'sta_type') {
       id = staMap.get(item._id) || item._id || '';
     } else if (groupBy === 'sub_type') {

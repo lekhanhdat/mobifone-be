@@ -34,12 +34,12 @@ const subscriberSchema = Joi.object({
   SUB_ID: Joi.string().required(),
   SUB_TYPE: Joi.string().required(),
   STA_DATE: Joi.date().required(),
-  END_DATE: Joi.date().optional(),
+  END_DATE: Joi.date().allow(null, '').optional(),
   PROVINCE: Joi.string().required(),
   DISTRICT: Joi.string().required(),
-  PCK_CODE: Joi.string().optional(),
-  PCK_DATE: Joi.date().optional(),
-  PCK_CHARGE: Joi.number().optional(),
+  PCK_CODE: Joi.string().allow(null, '').optional(),
+  PCK_DATE: Joi.date().allow(null, '').optional(),
+  PCK_CHARGE: Joi.number().allow(null, '').optional(),
 });
 
 module.exports = { filterSchema, registerSchema, loginSchema, subscriberSchema };

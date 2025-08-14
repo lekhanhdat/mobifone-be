@@ -63,10 +63,9 @@ exports.createSubscriber = async (req, res) => {
 
 exports.updateSubscriber = async (req, res) => {
   try {
+    delete req.body._id; // Fix "_id" not allowed
     const { error } = subscriberSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
-    
-    delete req.body._id;
 
     const subscriber = await Subscriber.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!subscriber) return res.status(404).json({ message: 'Subscriber not found' });
