@@ -3,6 +3,7 @@ const Subscriber = require('../models/subscriber.model');
 const District = require('../models/district.model');
 const StaType = require('../models/sta_type.model');
 const SubType = require('../models/sub_type.model');
+const Package = require('../models/package.model'); 
 
 let cache = null;
 const getFullNamesCache = async () => {
@@ -14,8 +15,9 @@ const getFullNamesCache = async () => {
       districtMap: new Map(districts.map(d => [`${d.PROVINCE}-${d.DISTRICT}`, d.FULL_NAME || d.DISTRICT])),
       staMap: new Map(staTypes.map(s => [s.STA_TYPE, s.NAME || s.STA_TYPE])),
       subMap: new Map(subTypes.map(s => [s.SUB_TYPE, s.NAME || s.SUB_TYPE])),
-      provinceMap: new Map([  // Hardcode 
+      provinceMap: new Map([  // Hardcode hoặc fetch từ model nếu có
         ['QNA', 'Quảng Nam'],
+        // Thêm tỉnh khác nếu cần, hoặc tạo model Province riêng
       ])
     };
   }
@@ -27,14 +29,14 @@ exports.getOptions = async () => {
   const provinces = await District.distinct('PROVINCE');
   const staTypes = Array.from(staMap.entries()).map(([value, label]) => ({ value, label }));
   const subTypes = Array.from(subMap.entries()).map(([value, label]) => ({ value, label }));
-  const pckCodes = await Subscriber.distinct('PCK_CODE').then(codes => codes.filter(code => code)); // Filter null
+  const pckCodes = await Package.find({}).select('code charge');
 
   return {
     provinces: provinces.map(code => ({ value: code, label: provinceMap.get(code) || code })),
     staTypes,
     subTypes,
     types: [{ value: 'C', label: 'Trả trước' }, { value: 'F', label: 'Trả sau' }], // Hardcode TYPE
-    pckCodes: pckCodes.map(code => ({ value: code, label: code })) // For dropdown optional
+    pckCodes: pckCodes.map(p => ({ value: p.code, label: p.code, charge: p.charge }))
   };
 };
 
@@ -47,7 +49,7 @@ exports.getDistrictsByProvince = async (province) => {
   return districts.map(d => ({ value: d.DISTRICT, label: d.FULL_NAME || d.DISTRICT }));
 };
 
-exports.getAggregationPie = async (groupBy) => {
+exports.getAggregationPie = async (groupBy, hasPackage = false) => { // Thêm param hasPackage
   let groupStage;
   if (groupBy === 'province') {
     groupStage = { _id: '$PROVINCE', count: { $sum: 1 } };
@@ -57,10 +59,15 @@ exports.getAggregationPie = async (groupBy) => {
     throw new Error('Invalid groupBy');
   }
 
+  const match = { DISTRICT: { $ne: null, $ne: '' } }; // Filter null/empty DISTRICT
+  if (hasPackage) {
+    match.PCK_CODE = { $exists: true, $ne: '' }; // Lọc chỉ có gói cước (tối ưu với index)
+  }
+
   const agg = await Subscriber.aggregate([
-    { $match: { DISTRICT: { $ne: null, $ne: '' } } }, // Filter null/empty DISTRICT
+    { $match: match },
     { $group: groupStage },
-    { $match: { count: { $gt: 0 } } }, // Filter count > 0
+    { $match: { count: { $gt: 0 } } },
     { $project: { _id: 0, label: '$_id', value: '$count' } }
   ]);
 
@@ -75,7 +82,7 @@ exports.getAggregationPie = async (groupBy) => {
     } else if (groupBy === 'district') {
       const prov = provinceMap.get(item.label.province) || item.label.province || 'Unknown';
       const dist = districtMap.get(`${item.label.province}-${item.label.district}`) || item.label.district || 'Unknown';
-      label = dist; // Only district, as requested
+      label = dist; // Chỉ district full name
     }
     if (!seenLabels.has(label)) {
       item.label = label;
@@ -87,7 +94,7 @@ exports.getAggregationPie = async (groupBy) => {
   return uniqueAgg;
 };
 
-exports.getBreakdownAgg = async (groupBy) => {
+exports.getBreakdownAgg = async (groupBy, hasPackage = false) => { // Thêm hasPackage nếu cần, nhưng breakdown chưa dùng ở Package
   let groupStage;
   if (groupBy === 'province-district') {
     groupStage = { _id: { province: '$PROVINCE', district: '$DISTRICT' }, count: { $sum: 1 } };
@@ -95,10 +102,15 @@ exports.getBreakdownAgg = async (groupBy) => {
     groupStage = { _id: `$${groupBy.toUpperCase()}`, count: { $sum: 1 } };
   }
 
+  const match = { DISTRICT: { $ne: null, $ne: '' } };
+  if (hasPackage) {
+    match.PCK_CODE = { $exists: true, $ne: '' };
+  }
+
   const agg = await Subscriber.aggregate([
-    { $match: { DISTRICT: { $ne: null, $ne: '' } } }, // Filter null/empty DISTRICT
+    { $match: match },
     { $group: groupStage },
-    { $match: { count: { $gt: 0 } } }, // Filter count > 0
+    { $match: { count: { $gt: 0 } } },
     { $sort: { count: -1 } }
   ]);
 
@@ -111,7 +123,7 @@ exports.getBreakdownAgg = async (groupBy) => {
     if (groupBy === 'province-district') {
       const prov = provinceMap.get(item._id.province) || item._id.province || 'Unknown';
       const dist = districtMap.get(`${item._id.province}-${item._id.district}`) || item._id.district || 'Unknown';
-      id = dist; // Only district, as requested
+      id = dist;
     } else if (groupBy === 'sta_type') {
       id = staMap.get(item._id) || item._id || '';
     } else if (groupBy === 'sub_type') {
@@ -147,15 +159,15 @@ exports.getSummaryStats = async (filter = {}) => {
     };
   }
 
-  const baseMatch = { }; // For no time
-  if (filter.province) baseMatch.PROVINCE = { $regex: filter.province, $options: 'i' }; // Case insensitive
+  const baseMatch = {}; // For no time
+  if (filter.province) baseMatch.PROVINCE = { $regex: filter.province, $options: 'i' };
   if (filter.district) baseMatch.DISTRICT = { $regex: filter.district, $options: 'i' };
 
   // Total: All time, province/district if filter
   const total = await Subscriber.countDocuments(baseMatch);
 
-  // Total packages: All time
-  const totalPackages = await Subscriber.countDocuments({ ...baseMatch, PCK_CODE: { $exists: true, $ne: null } });
+  // Total packages: All time, chỉ có PCK_CODE (tối ưu cho summary nếu cần hasPackage)
+  const totalPackages = await Subscriber.countDocuments({ ...baseMatch, PCK_CODE: { $exists: true, $ne: '' } });
 
   // New/hủy in time range
   const newSubs = await Subscriber.countDocuments({ ...baseMatch, STA_DATE: timeMatch });

@@ -1,5 +1,6 @@
 const subService = require('../services/subscriber.service');
 const Subscriber = require('../models/subscriber.model');
+const Package = require('../models/package.model');
 const { filterSchema } = require('../utils/validation');
 
 exports.getSummaryStats = async (req, res) => {
@@ -14,20 +15,43 @@ exports.getSummaryStats = async (req, res) => {
 
 exports.getPackageStats = async (req, res) => {
   try {
-    const { error } = filterSchema.validate(req.query);
-    if (error) return res.status(400).json({ error: error.details[0].message });
-    const { search, minCharge, hot } = req.query;
+    const { search, minCharge, hot, sortBy } = req.query; // Nếu có filter từ trước, giữ
+    let effectiveSortBy = sortBy || (hot ? 'count' : 'count'); // Default sort by count desc
+    if (!['count', 'avgCharge'].includes(effectiveSortBy)) effectiveSortBy = 'count';
+
     let pipeline = [
-      { $group: { _id: '$PCK_CODE', count: { $sum: 1 }, totalCharge: { $sum: '$PCK_CHARGE' }, avgCharge: { $avg: '$PCK_CHARGE' } } },
-      { $sort: { count: -1 } }
+      { $match: { PCK_CODE: { $exists: true, $ne: '' } } }, // Filter hasPackage
+      { 
+        $group: { 
+          _id: '$PCK_CODE', 
+          count: { $sum: 1 }, 
+          totalCharge: { $sum: { $toDouble: { $ifNull: ['$PCK_CHARGE', 0] } } }, 
+          avgCharge: { $avg: { $toDouble: { $ifNull: ['$PCK_CHARGE', 0] } } }  // Thêm avgCharge
+        } 
+      },
+      { $sort: { [effectiveSortBy]: -1 } } // Sort desc
     ];
-    if (search) pipeline.unshift({ $match: { PCK_CODE: { $regex: search, $options: 'i' } } });
+    if (search) pipeline[0].$match.PCK_CODE = { ...pipeline[0].$match.PCK_CODE, $regex: search, $options: 'i' };
     if (minCharge) pipeline.push({ $match: { avgCharge: { $gte: parseFloat(minCharge) } } });
-    if (hot) pipeline[pipeline.length - 1].$sort = { count: -1 }; // Already hot
+
     const stats = await Subscriber.aggregate(pipeline);
     res.json(stats);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.addPackage = async (req, res) => { // New function
+  try {
+    const { code, charge } = req.body;
+    if (!code || !charge) return res.status(400).json({ message: 'Code và charge bắt buộc' });
+    const existing = await Package.findOne({ code });
+    if (existing) return res.status(400).json({ message: 'Gói cước đã tồn tại' });
+    const newPackage = new Package({ code, charge });
+    await newPackage.save();
+    res.status(201).json(newPackage);
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server', details: err.message });
   }
 };
 

@@ -7,5 +7,6 @@ router.get('/packages', statsController.getPackageStats);
 router.get('/trend', statsController.getGrowthTrend);
 router.get('/distribution', statsController.getDistribution);
 router.get('/options', statsController.getOptions);
+router.post('/packages', statsController.addPackage);
 
 module.exports = router;

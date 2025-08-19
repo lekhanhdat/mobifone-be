@@ -127,9 +127,9 @@ exports.getDistricts = async (req, res) => {
 
 exports.getPieAgg = async (req, res) => {
   try {
-    const { groupBy } = req.query; // 'province' or 'district'
+    const { groupBy, hasPackage } = req.query; // 'province' or 'district', hasPackage=true/false
     if (!['province', 'district'].includes(groupBy)) return res.status(400).json({ error: 'Invalid groupBy' });
-    const data = await subService.getAggregationPie(groupBy);
+    const data = await subService.getAggregationPie(groupBy, hasPackage === 'true'); // Parse string to bool
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });

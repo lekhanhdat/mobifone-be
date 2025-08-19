@@ -11,15 +11,15 @@ const subscriberSchema = new mongoose.Schema({
   DISTRICT: { type: String, required: true }, // Bắt buộc
   PCK_CODE: { type: String, required: false }, // Optional
   PCK_DATE: { type: Date, required: false }, // Optional
-  PCK_CHARGE: { type: Number, required: false }, // Optional
+  PCK_CHARGE: { type: Number, required: false }, // Optional, dùng Number cho sum dễ
 });
 
-// Index cho query nhanh 
-subscriberSchema.index({ PROVINCE: 1, DISTRICT: 1 });
-subscriberSchema.index({ STA_DATE: 1 });
-subscriberSchema.index({ PCK_CODE: 1 });
-subscriberSchema.index({ END_DATE: 1 }); // Cho query canceled
+// Index tối ưu cho query nhanh
+subscriberSchema.index({ PCK_CODE: 1, PROVINCE: 1, DISTRICT: 1 }); // Compound cho pie hasPackage + groupBy province/district
+subscriberSchema.index({ STA_DATE: 1 }); // Cho trend/new subs
+subscriberSchema.index({ END_DATE: 1 }); // Cho canceled
 subscriberSchema.index({ SUB_TYPE: 1 });
 subscriberSchema.index({ STA_TYPE: 1 });
+subscriberSchema.index({ PCK_CODE: 1, PCK_CHARGE: 1 }); // Tối ưu sum/avg cho stats packages
 
 module.exports = mongoose.model("Subscriber", subscriberSchema);
