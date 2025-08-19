@@ -35,3 +35,5 @@ app.use((err, req, res, next) => {
 });
 
 app.use(cors({ origin: 'http://localhost:5173' })); 
+
+app.use('/api/packages', require('./routes/package.routes'));

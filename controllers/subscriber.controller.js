@@ -52,36 +52,40 @@ exports.createSubscriber = async (req, res) => {
   try {
     const { error } = subscriberSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
+
     const { PCK_CODE } = req.body;
     if (PCK_CODE) {
       const pkg = await Package.findOne({ PCK_CODE });
-      if (pkg) req.body.PCK_CHARGE = pkg.PCK_CHARGE; // Auto set fixed
+      req.body.PCK_CHARGE = pkg ? pkg.PCK_CHARGE : 0; // Auto set fixed or 0 if not found
     }
 
     const subscriber = new Subscriber(req.body);
     await subscriber.save();
     res.status(201).json(subscriber);
   } catch (err) {
-    res.status(500).json({ message: 'Internal error', details: err.message });
+    console.error('Error creating subscriber:', err);
+    res.status(500).json({ message: 'Lỗi thêm thuê bao', details: err.message });
   }
 };
 
 exports.updateSubscriber = async (req, res) => {
   try {
-    delete req.body._id; // Fix "_id" not allowed
+    delete req.body._id;
     const { error } = subscriberSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
+
     const { PCK_CODE } = req.body;
     if (PCK_CODE) {
       const pkg = await Package.findOne({ PCK_CODE });
-      if (pkg) req.body.PCK_CHARGE = pkg.PCK_CHARGE;
+      req.body.PCK_CHARGE = pkg ? pkg.PCK_CHARGE : 0; // Auto set
     }
 
     const subscriber = await Subscriber.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!subscriber) return res.status(404).json({ message: 'Subscriber not found' });
     res.json(subscriber);
   } catch (err) {
-    res.status(500).json({ message: 'Internal error', details: err.message });
+    console.error('Error updating subscriber:', err);
+    res.status(500).json({ message: 'Lỗi cập nhật thuê bao', details: err.message });
   }
 };
 
