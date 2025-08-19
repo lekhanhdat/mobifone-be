@@ -1,11 +1,12 @@
 const mongoose = require("mongoose");
 
 const packageSchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true }, // Tên gói, unique
-  charge: { type: Number, required: true }, // Giá fixed
+  PCK_CODE: { type: String, required: true, unique: true },
+  PCK_CHARGE: { type: Number, required: true } 
 });
 
-// Index cho query nhanh
-packageSchema.index({ code: 1 }); // Unique đã implicit index
+// Index tối ưu cho lookup/sort
+packageSchema.index({ PCK_CODE: 1 });
+packageSchema.index({ PCK_CHARGE: 1 }); 
 
 module.exports = mongoose.model("Package", packageSchema);

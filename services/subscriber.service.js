@@ -29,14 +29,14 @@ exports.getOptions = async () => {
   const provinces = await District.distinct('PROVINCE');
   const staTypes = Array.from(staMap.entries()).map(([value, label]) => ({ value, label }));
   const subTypes = Array.from(subMap.entries()).map(([value, label]) => ({ value, label }));
-  const pckCodes = await Package.find({}).select('code charge');
+  const pckCodes = await Package.find({}).select('PCK_CODE PCK_CHARGE');
 
   return {
     provinces: provinces.map(code => ({ value: code, label: provinceMap.get(code) || code })),
     staTypes,
     subTypes,
     types: [{ value: 'C', label: 'Trả trước' }, { value: 'F', label: 'Trả sau' }], // Hardcode TYPE
-    pckCodes: pckCodes.map(p => ({ value: p.code, label: p.code, charge: p.charge }))
+    pckCodes: pckCodes.map(p => ({ value: p.PCK_CODE, label: p.PCK_CODE, charge: p.PCK_CHARGE })) // Add charge for frontend auto
   };
 };
 

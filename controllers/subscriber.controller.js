@@ -52,6 +52,11 @@ exports.createSubscriber = async (req, res) => {
   try {
     const { error } = subscriberSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
+    const { PCK_CODE } = req.body;
+    if (PCK_CODE) {
+      const pkg = await Package.findOne({ PCK_CODE });
+      if (pkg) req.body.PCK_CHARGE = pkg.PCK_CHARGE; // Auto set fixed
+    }
 
     const subscriber = new Subscriber(req.body);
     await subscriber.save();
@@ -66,6 +71,11 @@ exports.updateSubscriber = async (req, res) => {
     delete req.body._id; // Fix "_id" not allowed
     const { error } = subscriberSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
+    const { PCK_CODE } = req.body;
+    if (PCK_CODE) {
+      const pkg = await Package.findOne({ PCK_CODE });
+      if (pkg) req.body.PCK_CHARGE = pkg.PCK_CHARGE;
+    }
 
     const subscriber = await Subscriber.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!subscriber) return res.status(404).json({ message: 'Subscriber not found' });

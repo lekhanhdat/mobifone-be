@@ -20,6 +20,7 @@ subscriberSchema.index({ STA_DATE: 1 }); // Cho trend/new subs
 subscriberSchema.index({ END_DATE: 1 }); // Cho canceled
 subscriberSchema.index({ SUB_TYPE: 1 });
 subscriberSchema.index({ STA_TYPE: 1 });
-subscriberSchema.index({ PCK_CODE: 1, PCK_CHARGE: 1 }); // Tối ưu sum/avg cho stats packages
+subscriberSchema.index({ PCK_CODE: 1, PCK_CHARGE: 1 }); // Đã có, hỗ trợ $avg/$sum totalCharge/avgCharge
+subscriberSchema.index({ PCK_CODE: 'text' }); // Cho search regex nhanh (text index for $regex)
 
 module.exports = mongoose.model("Subscriber", subscriberSchema);

@@ -15,29 +15,41 @@ exports.getSummaryStats = async (req, res) => {
 
 exports.getPackageStats = async (req, res) => {
   try {
-    const { search, minCharge, hot, sortBy } = req.query; // Nếu có filter từ trước, giữ
-    let effectiveSortBy = sortBy || (hot ? 'count' : 'count'); // Default sort by count desc
-    if (!['count', 'avgCharge'].includes(effectiveSortBy)) effectiveSortBy = 'count';
+    const { search, sortBy = 'count', sortOrder = 'desc' } = req.query;
+    const order = sortOrder === 'asc' ? 1 : -1;
+    const validSortFields = ['count', 'charge', 'totalCharge']; // Use 'charge' fixed
+    const effectiveSortBy = validSortFields.includes(sortBy) ? sortBy : 'count';
 
-    let pipeline = [
-      { $match: { PCK_CODE: { $exists: true, $ne: '' } } }, // Filter hasPackage
+    let match = { PCK_CODE: { $exists: true, $ne: '' } };
+    if (search) match.PCK_CODE = { $regex: search, $options: 'i' };
+
+    const pipeline = [
+      { $match: match },
       { 
         $group: { 
           _id: '$PCK_CODE', 
           count: { $sum: 1 }, 
-          totalCharge: { $sum: { $toDouble: { $ifNull: ['$PCK_CHARGE', 0] } } }, 
-          avgCharge: { $avg: { $toDouble: { $ifNull: ['$PCK_CHARGE', 0] } } }  // Thêm avgCharge
+          totalCharge: { $sum: '$PCK_CHARGE' } // Now Number, no $toDouble
         } 
       },
-      { $sort: { [effectiveSortBy]: -1 } } // Sort desc
+      { 
+        $lookup: { 
+          from: 'packages', 
+          localField: '_id', 
+          foreignField: 'PCK_CODE', 
+          as: 'packageInfo' 
+        } 
+      },
+      { $unwind: '$packageInfo' },
+      { $project: { _id: 1, count: 1, totalCharge: 1, charge: '$packageInfo.PCK_CHARGE' } }, // Number fixed
+      { $sort: { [effectiveSortBy]: order } }
     ];
-    if (search) pipeline[0].$match.PCK_CODE = { ...pipeline[0].$match.PCK_CODE, $regex: search, $options: 'i' };
-    if (minCharge) pipeline.push({ $match: { avgCharge: { $gte: parseFloat(minCharge) } } });
 
     const stats = await Subscriber.aggregate(pipeline);
     res.json(stats);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in getPackageStats:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
