@@ -15,6 +15,7 @@ const subscriberSchema = new mongoose.Schema({
 });
 
 // Index tối ưu cho query nhanh
+subscriberSchema.index({ SUB_ID: 1 });  // Index cho check nhanh
 subscriberSchema.index({ PCK_CODE: 1, PROVINCE: 1, DISTRICT: 1 }); // Compound cho pie hasPackage + groupBy province/district
 subscriberSchema.index({ STA_DATE: 1 }); // Cho trend/new subs
 subscriberSchema.index({ END_DATE: 1 }); // Cho canceled

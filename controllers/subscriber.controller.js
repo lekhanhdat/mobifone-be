@@ -1,5 +1,6 @@
 const Subscriber = require('../models/subscriber.model');
 const subService = require('../services/subscriber.service');
+const Package = require('../models/package.model'); 
 const { filterSchema } = require('../utils/validation');
 const { subscriberSchema } = require('../utils/validation');
 
@@ -52,6 +53,12 @@ exports.createSubscriber = async (req, res) => {
   try {
     const { error } = subscriberSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
+
+    // Check duplicate SUB_ID
+    const existingSub = await Subscriber.findOne({ SUB_ID: req.body.SUB_ID });
+    if (existingSub) {
+      return res.status(400).json({ message: 'Mã thuê bao đã tồn tại. Vui lòng nhập số khác!' });
+    }
 
     const { PCK_CODE } = req.body;
     if (PCK_CODE) {
