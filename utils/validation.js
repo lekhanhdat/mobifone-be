@@ -16,16 +16,18 @@ const filterSchema = Joi.object({
   hot: Joi.boolean().optional(),
 });
 
-// Schema cho auth (sẽ dùng sau)
+// Update register schema match model (email, username, fullName, password required)
 const registerSchema = Joi.object({
-  username: Joi.string().min(3).max(30).required(),
-  password: Joi.string().min(6).required(),
-  role: Joi.string().valid('admin', 'user').default('user'),
+  email: Joi.string().email({ tlds: { allow: false } }).required().messages({ 'string.email': 'Email không hợp lệ' }),
+  username: Joi.string().min(3).max(30).required().messages({ 'string.min': 'Username ít nhất 3 ký tự' }),
+  fullName: Joi.string().min(3).max(50).required().messages({ 'string.min': 'Full name ít nhất 3 ký tự' }),
+  password: Joi.string().min(6).required().messages({ 'string.min': 'Password ít nhất 6 ký tự' }),
 });
 
+// Update login schema (identifier: email or username, password)
 const loginSchema = Joi.object({
-  username: Joi.string().required(),
-  password: Joi.string().required(),
+  identifier: Joi.string().required().messages({ 'any.required': 'Email hoặc username bắt buộc' }),
+  password: Joi.string().required().messages({ 'any.required': 'Password bắt buộc' }),
 });
 
 const subscriberSchema = Joi.object({
