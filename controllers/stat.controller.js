@@ -102,6 +102,46 @@ exports.getGrowthTrend = async (req, res) => {
   }
 };
 
+exports.getPackageTrend = async (req, res) => {
+  try {
+    const { fromMonth, fromYear, toMonth, toYear, province, district } = req.query;
+    const now = new Date();
+    let start, end;
+    if (fromMonth && fromYear && toMonth && toYear) {
+      start = new Date(fromYear, fromMonth - 1, 1, 0, 0, 0); // Strict start month 00:00
+      end = new Date(toYear, toMonth, 0, 23, 59, 59); // Strict end month 23:59
+    } else {
+      // Default 12 months
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      start = new Date(end);
+      start.setMonth(start.getMonth() - 11);
+      start.setDate(1);
+      start.setHours(0, 0, 0);
+    }
+
+    const match = { 
+      PCK_DATE: { $gte: start, $lte: end, $exists: true } // Chỉ match nếu PCK_DATE tồn tại (gói cước optional)
+    }; 
+    if (province) match.PROVINCE = { $regex: province, $options: 'i' }; // Case insensitive
+    if (district) match.DISTRICT = { $regex: district, $options: 'i' };
+
+    const trend = await Subscriber.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { year: { $year: '$PCK_DATE' }, month: { $month: '$PCK_DATE' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $project: { label: { $concat: [{ $toString: '$_id.month' }, '/', { $toString: '$_id.year' } ] }, count: 1, _id: 0 } },
+    ]);
+    res.json(trend);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.getDistribution = async (req, res) => {
   try {
     const { error } = filterSchema.validate(req.query);

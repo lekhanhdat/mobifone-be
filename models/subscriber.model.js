@@ -16,10 +16,12 @@ const subscriberSchema = new mongoose.Schema({
 
 // Index tối ưu cho query nhanh
 subscriberSchema.index({ PCK_CODE: 1, PROVINCE: 1, DISTRICT: 1 }); // Compound cho pie hasPackage + groupBy province/district
+subscriberSchema.index({ PCK_DATE: 1, PROVINCE: 1, DISTRICT: 1 });
 subscriberSchema.index({ STA_DATE: 1 }); // Cho trend/new subs
 subscriberSchema.index({ END_DATE: 1 }); // Cho canceled
 subscriberSchema.index({ SUB_TYPE: 1 });
 subscriberSchema.index({ STA_TYPE: 1 });
+subscriberSchema.index({ PCK_DATE: 1 });
 subscriberSchema.index({ PCK_CODE: 1, PCK_CHARGE: 1 }); // Đã có, hỗ trợ $avg/$sum totalCharge/avgCharge
 subscriberSchema.index({ PCK_CODE: 'text' }); // Cho search regex nhanh (text index for $regex)
 subscriberSchema.index({ SUB_ID: 'text' });  // Index text cho search nhanh 
