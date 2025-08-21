@@ -4,7 +4,6 @@ const dotenv = require("dotenv");
 const morgan = require('morgan');  // Logging requests
 const helmet = require('helmet');  // Security headers
 const connectDB = require("./config/db");
-const { protect } = require('./middlewares/authMiddleware'); // Import protect (tạo nếu chưa)
 
 // Load biến môi trường
 dotenv.config();
@@ -24,10 +23,10 @@ app.get("/", (req, res) => {
   res.send("Hello from API");
 });
 
-app.use('/api/auth', require('./routes/auth.routes')); 
-app.use('/api/subscribers', protect, require('./routes/subscriber.routes'));
-app.use('/api/stats', protect, require('./routes/stat.routes'));
-app.use('/api/packages', protect, require('./routes/package.routes'));
+app.use('/api/subscribers', require('./routes/subscriber.routes'));
+app.use('/api/stats', require('./routes/stat.routes'));
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/packages', require('./routes/package.routes'));
 
 // Global error handler (merge, chỉ 1, an toàn không leak stack in production)
 app.use((err, req, res, next) => {
