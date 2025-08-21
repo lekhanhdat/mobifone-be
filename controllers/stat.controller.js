@@ -69,23 +69,34 @@ exports.addPackage = async (req, res) => { // New function
 
 exports.getGrowthTrend = async (req, res) => {
   try {
-    const { fromMonth, fromYear, toMonth, toYear, province, district } = req.query;
+    let { fromMonth, fromYear, toMonth, toYear, province, district } = req.query;
     const now = new Date();
-    let start = new Date(now.getFullYear(), now.getMonth() - 11, 1, 0, 0, 0); // Default last 12
-    let end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // Parse to numbers
+    fromMonth = fromMonth ? parseInt(fromMonth, 10) : null;
+    fromYear = fromYear ? parseInt(fromYear, 10) : null;
+    toMonth = toMonth ? parseInt(toMonth, 10) : null;
+    toYear = toYear ? parseInt(toYear, 10) : null;
 
-    if (fromMonth && fromYear) {
-      start = new Date(fromYear, fromMonth - 1, 1, 0, 0, 0); // Strict day 1 00:00
+    // Default: last 12 months
+    let end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); // Last day current month
+    let start = new Date(end.getFullYear(), end.getMonth() - 11, 1, 0, 0, 0); // 12 months back, first day
+
+    // Override if provided
+    if (fromYear && fromMonth) {
+      start = new Date(fromYear, fromMonth - 1, 1, 0, 0, 0);
     }
-    if (toMonth && toYear) {
-      end = new Date(toYear, toMonth, 0, 23, 59, 59); // Strict end month 23:59
+    if (toYear && toMonth) {
+      end = new Date(toYear, toMonth, 0, 23, 59, 59); // Last day of toMonth
     }
 
-    const match = { STA_DATE: { $gte: start, $lte: end, $exists: true } }; // Strict no extra
-    if (province) match.PROVINCE = { $regex: province, $options: 'i' }; // Case insensitive
+    // Log for debug (remove after test)
+    console.log(`Trend range: start=${start.toISOString()}, end=${end.toISOString()}`);
+
+    const match = { STA_DATE: { $gte: start, $lte: end, $exists: true } };
+    if (province) match.PROVINCE = { $regex: province, $options: 'i' };
     if (district) match.DISTRICT = { $regex: district, $options: 'i' };
 
-    const trend = await Subscriber.aggregate([
+    let trend = await Subscriber.aggregate([
       { $match: match },
       {
         $group: {
@@ -96,6 +107,10 @@ exports.getGrowthTrend = async (req, res) => {
       { $sort: { '_id.year': 1, '_id.month': 1 } },
       { $project: { label: { $concat: [{ $toString: '$_id.month' }, '/', { $toString: '$_id.year' } ] }, count: 1, _id: 0 } },
     ]);
+
+    // Fill missing months with count 0
+    trend = fillTrend(trend, start, end);
+
     res.json(trend);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -104,28 +119,34 @@ exports.getGrowthTrend = async (req, res) => {
 
 exports.getPackageTrend = async (req, res) => {
   try {
-    const { fromMonth, fromYear, toMonth, toYear, province, district } = req.query;
+    let { fromMonth, fromYear, toMonth, toYear, province, district } = req.query;
     const now = new Date();
-    let start, end;
-    if (fromMonth && fromYear && toMonth && toYear) {
-      start = new Date(fromYear, fromMonth - 1, 1, 0, 0, 0); // Strict start month 00:00
-      end = new Date(toYear, toMonth, 0, 23, 59, 59); // Strict end month 23:59
-    } else {
-      // Default 12 months
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      start = new Date(end);
-      start.setMonth(start.getMonth() - 11);
-      start.setDate(1);
-      start.setHours(0, 0, 0);
+    // Parse to numbers
+    fromMonth = fromMonth ? parseInt(fromMonth, 10) : null;
+    fromYear = fromYear ? parseInt(fromYear, 10) : null;
+    toMonth = toMonth ? parseInt(toMonth, 10) : null;
+    toYear = toYear ? parseInt(toYear, 10) : null;
+
+    // Default: last 12 months
+    let end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    let start = new Date(end.getFullYear(), end.getMonth() - 11, 1, 0, 0, 0);
+
+    // Override if provided
+    if (fromYear && fromMonth) {
+      start = new Date(fromYear, fromMonth - 1, 1, 0, 0, 0);
+    }
+    if (toYear && toMonth) {
+      end = new Date(toYear, toMonth, 0, 23, 59, 59);
     }
 
-    const match = { 
-      PCK_DATE: { $gte: start, $lte: end, $exists: true } // Chỉ match nếu PCK_DATE tồn tại (gói cước optional)
-    }; 
-    if (province) match.PROVINCE = { $regex: province, $options: 'i' }; // Case insensitive
+    // Log for debug
+    console.log(`Package trend range: start=${start.toISOString()}, end=${end.toISOString()}`);
+
+    const match = { PCK_DATE: { $gte: start, $lte: end, $exists: true } };
+    if (province) match.PROVINCE = { $regex: province, $options: 'i' };
     if (district) match.DISTRICT = { $regex: district, $options: 'i' };
 
-    const trend = await Subscriber.aggregate([
+    let trend = await Subscriber.aggregate([
       { $match: match },
       {
         $group: {
@@ -136,10 +157,29 @@ exports.getPackageTrend = async (req, res) => {
       { $sort: { '_id.year': 1, '_id.month': 1 } },
       { $project: { label: { $concat: [{ $toString: '$_id.month' }, '/', { $toString: '$_id.year' } ] }, count: 1, _id: 0 } },
     ]);
+
+    // Fill missing months with count 0
+    trend = fillTrend(trend, start, end);
+
     res.json(trend);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
+
+// Helper function to fill missing months (add to file)
+const fillTrend = (trend, start, end) => {
+  const result = [];
+  let current = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (current <= end) {
+    const month = current.getMonth() + 1;
+    const year = current.getFullYear();
+    const label = `${month}/${year}`;
+    const found = trend.find(t => t.label === label);
+    result.push({ label, count: found ? found.count : 0 });
+    current.setMonth(current.getMonth() + 1);
+  }
+  return result;
 };
 
 exports.getDistribution = async (req, res) => {
