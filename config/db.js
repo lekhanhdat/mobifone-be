@@ -1,12 +1,12 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-    console.log("MongoDB connected to database:", conn.connection.name); // Log DB name
-  } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
-    process.exit(1);
+    await mongoose.connect(process.env.MONGO_URI); 
+    console.log('MongoDB connected to Atlas'); // Log confirm
+  } catch (err) {
+    console.error('DB connect error:', err.message);
+    process.exit(1); 
   }
 };
 
