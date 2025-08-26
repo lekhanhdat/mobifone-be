@@ -16,7 +16,10 @@ const app = express();
 // Middleware clean & secure
 app.use(helmet());  // Bảo vệ headers (CSP, XSS...)
 app.use(morgan('dev'));  // Log requests (dev mode: colored)
-app.use(cors({ origin: 'http://localhost:5173' }));  // Frontend Vite port
+app.use(cors({
+  origin: ['https://mobifone-fe.vercel.app'],
+  credentials: true
+}));
 app.use(express.json({ limit: '1mb' }));  // Parse JSON, giới hạn size tránh DDoS
 
 app.get("/", (req, res) => {
